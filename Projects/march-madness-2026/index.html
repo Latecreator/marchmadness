@@ -1,0 +1,1641 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>2026 NCAA March Madness — d20 Bracket</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: #0a0e1a;
+    color: #e8e8e8;
+    font-family: 'Segoe UI', system-ui, sans-serif;
+    font-size: 12px;
+    min-height: 100vh;
+  }
+
+  header {
+    background: linear-gradient(135deg, #002868 0%, #BF0A30 100%);
+    padding: 16px 24px;
+    text-align: center;
+    border-bottom: 3px solid #f5c518;
+  }
+  header h1 { font-size: 22px; font-weight: 800; letter-spacing: 2px; text-transform: uppercase; color: #fff; }
+  header p { font-size: 12px; color: #ffd; margin-top: 4px; opacity: 0.85; }
+
+  /* ── CHAMPION BANNER ── */
+  #champion-banner {
+    display: none;
+    background: linear-gradient(135deg, #f5c518, #ff8c00);
+    color: #000;
+    text-align: center;
+    padding: 18px;
+    font-size: 20px;
+    font-weight: 900;
+    letter-spacing: 2px;
+  }
+
+  /* ── CONTROLS ── */
+  .controls {
+    display: flex;
+    gap: 12px;
+    padding: 12px 24px;
+    background: #111827;
+    border-bottom: 1px solid #1f2937;
+    align-items: center;
+    flex-wrap: wrap;
+  }
+  .controls label { font-size: 12px; color: #9ca3af; }
+  .controls select, .controls input {
+    background: #1f2937;
+    border: 1px solid #374151;
+    color: #e8e8e8;
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 12px;
+  }
+  .btn {
+    padding: 5px 14px;
+    border-radius: 4px;
+    border: none;
+    cursor: pointer;
+    font-size: 12px;
+    font-weight: 600;
+    transition: opacity 0.15s;
+  }
+  .btn:hover { opacity: 0.85; }
+  .btn-primary { background: #3b82f6; color: #fff; }
+  .btn-danger  { background: #ef4444; color: #fff; }
+  .btn-gold    { background: #f5c518; color: #000; }
+  .btn-green   { background: #22c55e; color: #fff; }
+
+  /* ── DICE LOG ── */
+  #dice-log {
+    max-height: 80px;
+    overflow-y: auto;
+    padding: 6px 24px;
+    background: #0d1117;
+    border-bottom: 1px solid #1f2937;
+    font-size: 11px;
+    color: #6b7280;
+    font-family: monospace;
+  }
+  #dice-log .entry { margin-bottom: 2px; }
+  #dice-log .entry span { color: #f5c518; }
+
+  /* ── BRACKET SCROLL WRAPPER ── */
+  .bracket-scroll {
+    overflow-x: auto;
+    padding: 20px 24px 40px;
+  }
+
+  /* ── BRACKET MAIN: 3-column layout ── */
+  .bracket-main {
+    display: grid;
+    grid-template-columns: 1fr 140px 1fr;
+    gap: 8px;
+    min-width: 1400px;
+    align-items: stretch;
+  }
+
+  /* Left/right sides stack two regions vertically */
+  .side-left, .side-right {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  /* Each region: label + rounds */
+  .region-half {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  /* 4 round columns inside a region */
+  .region-rounds {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 4px;
+  }
+
+  /* Region label */
+  .region-label {
+    text-align: center;
+    font-size: 13px;
+    font-weight: 800;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    color: #3b82f6;
+    padding: 4px 0;
+  }
+  .region-label.right { color: #f59e0b; }
+
+  /* Center column: FF + Champ, vertically centered across full height */
+  .center-col {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+  }
+
+  /* ── ROUND COLUMNS ── */
+  .round-col {
+    display: flex;
+    flex-direction: column;
+    justify-content: space-around;
+    gap: 4px;
+  }
+
+  /* ── GAME CARD ── */
+  .game {
+    background: #1a1f2e;
+    border: 1px solid #2d3748;
+    border-radius: 6px;
+    overflow: hidden;
+    position: relative;
+    margin: 2px 0;
+  }
+  .game.locked { opacity: 0.5; }
+  .game.ready { border-color: #3b82f6; }
+  .game.done { border-color: #374151; }
+
+  .team-slot {
+    display: flex;
+    align-items: center;
+    padding: 4px 6px;
+    border-bottom: 1px solid #2d3748;
+    min-height: 26px;
+    gap: 4px;
+  }
+  .team-slot:last-of-type { border-bottom: none; }
+  .team-slot.winner {
+    background: rgba(34, 197, 94, 0.15);
+    border-left: 3px solid #22c55e;
+  }
+  .team-slot.loser {
+    opacity: 0.45;
+  }
+  .team-slot.empty {
+    color: #4b5563;
+    font-style: italic;
+  }
+
+  .seed {
+    font-size: 9px;
+    color: #6b7280;
+    min-width: 14px;
+    font-weight: 700;
+  }
+  .team-name {
+    flex: 1;
+    font-size: 11px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .score-badge {
+    font-size: 11px;
+    font-weight: 700;
+    color: #f5c518;
+    min-width: 22px;
+    text-align: right;
+  }
+
+  .game-footer {
+    display: flex;
+    justify-content: center;
+    padding: 3px;
+    background: #111827;
+  }
+  .roll-btn {
+    font-size: 10px;
+    padding: 2px 10px;
+    border-radius: 3px;
+    border: none;
+    cursor: pointer;
+    font-weight: 700;
+    background: #3b82f6;
+    color: #fff;
+    transition: background 0.15s;
+  }
+  .roll-btn:hover { background: #2563eb; }
+  .roll-btn:disabled { background: #374151; color: #6b7280; cursor: default; }
+  .roll-btn.btn-done { background: #1e3a2f; color: #4ade80; border: 1px solid #166534; }
+  .roll-btn.btn-done:hover { background: #166534; color: #bbf7d0; }
+
+  /* Final Four / Championship */
+  .ff-game {
+    background: #1a1f2e;
+    border: 2px solid #f5c518;
+    border-radius: 8px;
+    overflow: hidden;
+    width: 100%;
+    min-width: 120px;
+  }
+  .ff-game .game-footer { background: #0d1117; }
+  .champ-slot {
+    background: #1a1f2e;
+    border: 2px solid #f5c518;
+    border-radius: 8px;
+    padding: 8px 10px;
+    text-align: center;
+    font-size: 11px;
+    font-weight: 700;
+    color: #f5c518;
+    min-width: 120px;
+  }
+  .champ-slot.filled {
+    background: linear-gradient(135deg, #1a1200, #1a1f2e);
+    color: #f5c518;
+  }
+  .ff-label {
+    font-size: 9px;
+    text-align: center;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: #6b7280;
+    margin-bottom: 4px;
+  }
+
+  /* Connector lines */
+  .connector {
+    width: 8px;
+    border-top: 1px solid #2d3748;
+    align-self: center;
+  }
+
+  /* Roll all btn */
+  #sim-region-btns { display: flex; gap: 8px; flex-wrap: wrap; }
+
+  /* ── TABS ── */
+  .tab-bar {
+    display: flex;
+    gap: 0;
+    background: #111827;
+    border-bottom: 2px solid #1f2937;
+    padding: 0 24px;
+  }
+  .tab-btn {
+    background: none;
+    border: none;
+    border-bottom: 3px solid transparent;
+    color: #6b7280;
+    cursor: pointer;
+    font-size: 13px;
+    font-weight: 600;
+    padding: 10px 18px;
+    margin-bottom: -2px;
+    transition: color 0.15s, border-color 0.15s;
+  }
+  .tab-btn:hover { color: #e8e8e8; }
+  .tab-btn.active { color: #e8e8e8; border-bottom-color: #3b82f6; }
+
+  /* ── RESULTS TABLE ── */
+  .results-section { margin-bottom: 32px; }
+  .results-section h2 {
+    font-size: 13px;
+    font-weight: 800;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: #3b82f6;
+    margin-bottom: 10px;
+    border-bottom: 1px solid #1f2937;
+    padding-bottom: 6px;
+  }
+  .results-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 12px;
+  }
+  .results-table th {
+    text-align: left;
+    padding: 6px 12px;
+    background: #1a1f2e;
+    color: #6b7280;
+    font-weight: 700;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+  }
+  .results-table td {
+    padding: 7px 12px;
+    border-bottom: 1px solid #1f2937;
+  }
+  .results-table tr:last-child td { border-bottom: none; }
+  .results-table tr:hover td { background: #1a1f2e; }
+  .res-winner { color: #22c55e; font-weight: 700; }
+  .res-loser  { color: #6b7280; }
+  .res-score  { font-weight: 700; color: #f5c518; font-size: 13px; }
+  .res-region { font-size: 10px; color: #4b5563; text-transform: uppercase; letter-spacing: 1px; }
+  .res-pending { color: #4b5563; font-style: italic; }
+
+  /* ── PLAY MODAL ── */
+  .modal-overlay {
+    display: none;
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,0.75);
+    z-index: 1000;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+  }
+  .modal-overlay.open { display: flex; }
+  .modal {
+    background: #141822;
+    border: 1px solid #2d3748;
+    border-radius: 12px;
+    width: 100%;
+    max-width: 640px;
+    max-height: 90vh;
+    overflow-y: auto;
+    box-shadow: 0 25px 60px rgba(0,0,0,0.6);
+  }
+  .modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 14px 18px;
+    background: linear-gradient(135deg, #002868, #BF0A30);
+    border-radius: 12px 12px 0 0;
+  }
+  .modal-header h3 { font-size: 13px; font-weight: 800; letter-spacing: 1px; text-transform: uppercase; color: #fff; }
+  .modal-header .close-btn { background: none; border: none; color: #fff; font-size: 20px; cursor: pointer; line-height: 1; opacity: 0.7; }
+  .modal-header .close-btn:hover { opacity: 1; }
+  .modal-body { padding: 16px; }
+
+  /* Team panels */
+  .team-panels { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 14px; }
+  .team-panel {
+    background: #1a1f2e;
+    border: 1px solid #2d3748;
+    border-radius: 8px;
+    padding: 12px;
+  }
+  .team-panel.panel-t1 { border-top: 3px solid #3b82f6; }
+  .team-panel.panel-t2 { border-top: 3px solid #f59e0b; }
+  .tp-name { font-size: 14px; font-weight: 800; margin-bottom: 4px; }
+  .tp-seed { font-size: 10px; color: #6b7280; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 6px; }
+  .tp-row { display: flex; justify-content: space-between; font-size: 11px; margin-bottom: 3px; }
+  .tp-label { color: #6b7280; }
+  .tp-val { font-weight: 600; }
+  .tp-tsr-pos { color: #22c55e; }
+  .tp-tsr-zero { color: #f5c518; }
+  .tp-tsr-neg { color: #ef4444; }
+  .tp-formula {
+    margin-top: 8px;
+    padding: 6px 8px;
+    background: #0d1117;
+    border-radius: 4px;
+    font-size: 10px;
+    color: #9ca3af;
+    font-family: monospace;
+  }
+  .tp-formula .formula-val { color: #f5c518; font-weight: 700; }
+
+  /* Roll section */
+  .roll-section { margin-bottom: 12px; }
+  .roll-section-title {
+    font-size: 11px; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 1px; color: #6b7280; margin-bottom: 8px;
+    border-bottom: 1px solid #1f2937; padding-bottom: 4px;
+  }
+  .roll-row {
+    display: grid;
+    grid-template-columns: auto 1fr auto auto;
+    gap: 8px;
+    align-items: center;
+    margin-bottom: 8px;
+  }
+  .roll-team-name { font-size: 12px; font-weight: 700; min-width: 110px; }
+  .roll-input {
+    background: #0d1117;
+    border: 1px solid #374151;
+    color: #f5c518;
+    font-size: 18px;
+    font-weight: 800;
+    text-align: center;
+    width: 60px;
+    padding: 4px;
+    border-radius: 4px;
+  }
+  .roll-input:focus { outline: none; border-color: #3b82f6; }
+  .auto-roll-btn {
+    padding: 4px 10px; border-radius: 4px; border: none;
+    background: #374151; color: #e8e8e8; font-size: 11px;
+    font-weight: 600; cursor: pointer;
+  }
+  .auto-roll-btn:hover { background: #4b5563; }
+  .narrative-box {
+    margin-top: 4px; margin-bottom: 8px;
+    padding: 6px 10px;
+    background: #0d1117;
+    border-left: 3px solid #374151;
+    border-radius: 0 4px 4px 0;
+    font-size: 11px;
+    color: #9ca3af;
+    font-style: italic;
+    min-height: 28px;
+  }
+  .narrative-box.t1-narr { border-left-color: #3b82f6; }
+  .narrative-box.t2-narr { border-left-color: #f59e0b; }
+
+  /* Score display */
+  .score-display {
+    background: #0d1117;
+    border-radius: 8px;
+    padding: 14px;
+    text-align: center;
+    margin-bottom: 14px;
+    border: 1px solid #1f2937;
+  }
+  .score-display .score-line {
+    font-size: 24px;
+    font-weight: 900;
+    color: #f5c518;
+    letter-spacing: 2px;
+  }
+  .score-display .score-teams {
+    font-size: 11px;
+    color: #6b7280;
+    margin-top: 4px;
+  }
+  .score-display .score-winner {
+    font-size: 13px;
+    font-weight: 700;
+    color: #22c55e;
+    margin-top: 6px;
+  }
+  .score-display .ot-badge {
+    font-size: 10px;
+    color: #f59e0b;
+    margin-top: 3px;
+  }
+  .score-display.pending { color: #4b5563; }
+
+  /* Submit button */
+  .submit-btn {
+    width: 100%;
+    padding: 12px;
+    border-radius: 6px;
+    border: none;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    background: #22c55e;
+    color: #fff;
+    transition: background 0.15s;
+  }
+  .submit-btn:hover { background: #16a34a; }
+  .submit-btn:disabled { background: #374151; color: #6b7280; cursor: default; }
+
+  /* Light mode modal */
+  body.light .modal { background: #fff; border-color: #e5e7eb; }
+  body.light .team-panel { background: #f9fafb; border-color: #e5e7eb; }
+  body.light .tp-label { color: #9ca3af; }
+  body.light .tp-formula { background: #f3f4f6; color: #6b7280; }
+  body.light .roll-input { background: #f3f4f6; border-color: #d1d5db; }
+  body.light .narrative-box { background: #f9fafb; color: #6b7280; }
+  body.light .score-display { background: #f3f4f6; border-color: #e5e7eb; }
+  body.light .auto-roll-btn { background: #e5e7eb; color: #374151; }
+  body.light .auto-roll-btn:hover { background: #d1d5db; }
+
+  /* Light mode results */
+  body.light .tab-bar { background: #e5e7eb; border-bottom-color: #d1d5db; }
+  body.light .tab-btn { color: #9ca3af; }
+  body.light .tab-btn:hover { color: #111827; }
+  body.light .tab-btn.active { color: #111827; border-bottom-color: #3b82f6; }
+  body.light .results-section h2 { border-bottom-color: #e5e7eb; }
+  body.light .results-table th { background: #f3f4f6; color: #9ca3af; }
+  body.light .results-table td { border-bottom-color: #e5e7eb; color: #111827; }
+  body.light .results-table tr:hover td { background: #f9fafb; }
+  body.light .res-loser { color: #9ca3af; }
+  body.light .res-region { color: #d1d5db; }
+  body.light .res-pending { color: #d1d5db; }
+
+  /* ── LIGHT MODE ── */
+  body.light { background: #f3f4f6; color: #111827; }
+  body.light .controls { background: #e5e7eb; border-bottom-color: #d1d5db; }
+  body.light .controls label { color: #6b7280; }
+  body.light .controls select { background: #fff; border-color: #d1d5db; color: #111827; }
+  body.light #dice-log { background: #fff; border-bottom-color: #e5e7eb; color: #6b7280; }
+  body.light #dice-log .entry span { color: #b45309; }
+  body.light .game { background: #fff; border-color: #d1d5db; }
+  body.light .game.ready { border-color: #3b82f6; }
+  body.light .game.done { border-color: #d1d5db; }
+  body.light .team-slot { border-bottom-color: #e5e7eb; }
+  body.light .team-slot.empty { color: #9ca3af; }
+  body.light .seed { color: #9ca3af; }
+  body.light .score-badge { color: #b45309; }
+  body.light .game-footer { background: #f9fafb; }
+  body.light .roll-btn:disabled { background: #e5e7eb; color: #9ca3af; }
+  body.light .ff-game { background: #fff; }
+  body.light .ff-game .game-footer { background: #f9fafb; }
+  body.light .ff-label { color: #9ca3af; }
+  body.light .bracket-scroll { background: #f3f4f6; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>2026 NCAA Division I Men's Basketball Championship</h1>
+  <p>d20 Dice Engine — Roll to advance each game</p>
+</header>
+
+<div id="champion-banner"></div>
+
+<div class="controls">
+  <div id="sim-region-btns">
+    <button class="btn btn-primary" onclick="simRegion('east')">Auto East</button>
+    <button class="btn btn-primary" onclick="simRegion('south')">Auto South</button>
+    <button class="btn btn-primary" onclick="simRegion('west')">Auto West</button>
+    <button class="btn btn-primary" onclick="simRegion('midwest')">Auto Midwest</button>
+    <button class="btn btn-gold" onclick="simAll()">⚡ Auto Sim All</button>
+  </div>
+  <button class="btn" onclick="showRules()" style="background:#0e7490;color:#fff">📖 Rules</button>
+  <button class="btn btn-danger" onclick="resetBracket()">Reset</button>
+  <button class="btn btn-green" onclick="exportCSV()">⬇ Export CSV</button>
+  <button class="btn" onclick="importCSV()" style="background:#7c3aed;color:#fff">⬆ Import CSV</button>
+  <input type="file" id="csv-import-input" accept=".csv" style="display:none" onchange="onCSVImport(event)">
+  <button class="btn" id="theme-toggle" onclick="toggleTheme()" style="background:#374151;color:#e8e8e8">☀ Light</button>
+</div>
+
+<!-- ── RULES MODAL ── -->
+<div class="modal-overlay" id="rules-modal">
+  <div class="modal" style="max-width:560px">
+    <div class="modal-header" style="background:linear-gradient(135deg,#0e7490,#0369a1)">
+      <h3>📖 D20 One-Roll Playbook — 2026 Edition</h3>
+      <button class="close-btn" onclick="closeRules()">×</button>
+    </div>
+    <div class="modal-body" style="font-size:12px;line-height:1.6">
+
+      <div style="margin-bottom:14px">
+        <div class="roll-section-title">Step 1 — Team Strength Rating (TSR)</div>
+        <p style="color:#9ca3af;margin-bottom:8px">Assigned from each team's Net Rating (NRtg):</p>
+        <table class="results-table" style="width:100%">
+          <thead><tr><th>NRtg</th><th>Team Quality</th><th>TSR</th></tr></thead>
+          <tbody>
+            <tr><td>+25.0 or higher</td><td>National Title Favorite</td><td style="color:#22c55e;font-weight:700">+3</td></tr>
+            <tr><td>+15.0 to +24.9</td><td>Elite / Top 10</td><td style="color:#86efac;font-weight:700">+2</td></tr>
+            <tr><td>+5.0 to +14.9</td><td>Tournament Contender</td><td style="color:#bbf7d0;font-weight:700">+1</td></tr>
+            <tr><td>−4.9 to +4.9</td><td>Average / Bubble Team</td><td style="color:#f5c518;font-weight:700">0</td></tr>
+            <tr><td>−5.0 to −14.9</td><td>Low Seed / Upset Potential</td><td style="color:#fca5a5;font-weight:700">−1</td></tr>
+            <tr><td>−15.0 or lower</td><td>Bottom Tier</td><td style="color:#ef4444;font-weight:700">−2</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div style="margin-bottom:14px">
+        <div class="roll-section-title">Step 2 — Base Score Formula</div>
+        <div style="background:#0d1117;border-radius:6px;padding:10px;font-family:monospace;color:#f5c518;font-size:13px;text-align:center">
+          75 + (Offense TSR × 3) − (Opponent TSR × 2)
+        </div>
+        <p style="color:#9ca3af;margin-top:6px">Calculate this before rolling for each team separately.</p>
+      </div>
+
+      <div style="margin-bottom:14px">
+        <div class="roll-section-title">Step 3 — D20 Scoring Table</div>
+        <p style="color:#9ca3af;margin-bottom:8px">Roll one d20 per team. Add the modifier to the base score.</p>
+        <table class="results-table" style="width:100%">
+          <thead><tr><th>Roll</th><th>Modifier</th><th>Narrative</th></tr></thead>
+          <tbody>
+            <tr><td>1</td><td style="color:#ef4444;font-weight:700">−18</td><td>Total Collapse: Team shoots &lt;30%. Absolute offensive failure.</td></tr>
+            <tr><td>2–4</td><td style="color:#f97316;font-weight:700">−10</td><td>Defensive Lock: Opposing big man dominates the paint.</td></tr>
+            <tr><td>5–9</td><td style="color:#fbbf24;font-weight:700">−4</td><td>Cold Spell: Star player in foul trouble; rotation is out of sync.</td></tr>
+            <tr><td>10–14</td><td style="color:#a3a3a3;font-weight:700">+2</td><td>Standard Flow: Trading baskets. Good ball movement.</td></tr>
+            <tr><td>15–18</td><td style="color:#86efac;font-weight:700">+8</td><td>Heating Up: Hitting the extra-pass 3s. Momentum building.</td></tr>
+            <tr><td>19</td><td style="color:#4ade80;font-weight:700">+14</td><td>On Fire: A massive 12-0 run defines the second half.</td></tr>
+            <tr><td>20</td><td style="color:#22c55e;font-weight:700">+22</td><td>Historic Night: Everything falls. Bench players hitting 3s.</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div style="margin-bottom:6px">
+        <div class="roll-section-title">Step 4 — Overtime</div>
+        <p style="color:#9ca3af">If scores are tied after regulation, both teams roll again. Apply the same formula but divide the final result by 8 (round up) and add to the regulation score. Repeat if still tied.</p>
+      </div>
+
+      <div style="background:#1a1f2e;border-radius:6px;padding:10px;margin-top:12px;border-left:3px solid #f5c518">
+        <div style="font-size:11px;font-weight:700;color:#f5c518;margin-bottom:4px">Example</div>
+        <div style="color:#9ca3af;font-size:11px">
+          Duke (TSR +3) vs Siena (TSR −1)<br>
+          Duke base: 75 + (3×3) − (−1×2) = <strong style="color:#e8e8e8">86</strong><br>
+          Siena base: 75 + (−1×3) − (3×2) = <strong style="color:#e8e8e8">66</strong><br>
+          Duke rolls 12 (+2) → <strong style="color:#f5c518">88</strong> &nbsp;|&nbsp; Siena rolls 8 (−4) → <strong style="color:#f5c518">62</strong><br>
+          <strong style="color:#22c55e">Duke wins 88–62</strong>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<!-- ── PLAY MODAL ── -->
+<div class="modal-overlay" id="play-modal">
+  <div class="modal">
+    <div class="modal-header">
+      <h3 id="modal-title">Game</h3>
+      <button class="close-btn" onclick="closeModal()">×</button>
+    </div>
+    <div class="modal-body">
+      <!-- Team panels -->
+      <div class="team-panels">
+        <div class="team-panel panel-t1" id="panel-t1"></div>
+        <div class="team-panel panel-t2" id="panel-t2"></div>
+      </div>
+      <!-- Roll phase -->
+      <div class="roll-section">
+        <div class="roll-section-title">🎲 Roll Phase — roll a d20 for each team or press Auto</div>
+        <div class="roll-row">
+          <span class="roll-team-name" id="roll-name-1">Team 1</span>
+          <input class="roll-input" id="roll-input-1" type="number" min="1" max="20" placeholder="—" oninput="onRollInput(1)">
+          <button class="auto-roll-btn" onclick="autoRoll(1)">🎲 Auto</button>
+        </div>
+        <div class="narrative-box t1-narr" id="narrative-1"></div>
+        <div class="roll-row">
+          <span class="roll-team-name" id="roll-name-2">Team 2</span>
+          <input class="roll-input" id="roll-input-2" type="number" min="1" max="20" placeholder="—" oninput="onRollInput(2)">
+          <button class="auto-roll-btn" onclick="autoRoll(2)">🎲 Auto</button>
+        </div>
+        <div class="narrative-box t2-narr" id="narrative-2"></div>
+      </div>
+      <!-- Score display -->
+      <div class="score-display pending" id="score-display">
+        <div class="score-line" id="score-line">— vs —</div>
+        <div class="score-teams" id="score-teams"></div>
+        <div class="score-winner" id="score-winner"></div>
+        <div class="ot-badge" id="ot-badge"></div>
+      </div>
+      <!-- Submit -->
+      <button class="submit-btn" id="submit-btn" disabled onclick="submitModal()">Submit Result</button>
+    </div>
+  </div>
+</div>
+
+<div id="dice-log"><div style="color:#4b5563;font-style:italic">Roll a game to see dice results here...</div></div>
+
+<div class="tab-bar">
+  <button class="tab-btn active" onclick="switchTab('bracket')">🏀 Bracket</button>
+  <button class="tab-btn" onclick="switchTab('results')">📋 Results</button>
+</div>
+
+<div class="bracket-scroll" id="tab-bracket">
+  <div id="bracket"></div>
+</div>
+
+<div id="tab-results" style="display:none;padding:24px;overflow-x:auto"></div>
+
+<script>
+// ══════════════════════════════════════════════════════════════════════
+//  BRACKET DATA — 2026 NCAA Tournament
+// ══════════════════════════════════════════════════════════════════════
+const REGIONS = {
+  east: {
+    name: 'EAST',
+    teams: [
+      { seed: 1,  name: 'Duke',          nrtg: 44.43, w: 32, l: 2  },
+      { seed: 16, name: 'Siena',         nrtg: -6.52, w: 23, l: 11 },
+      { seed: 8,  name: 'Ohio St.',      nrtg: 26.48, w: 21, l: 12 },
+      { seed: 9,  name: 'TCU',           nrtg: 21.53, w: 22, l: 11 },
+      { seed: 5,  name: "St. John's",    nrtg: 30.03, w: 28, l: 6  },
+      { seed: 12, name: 'Northern Iowa', nrtg: 12.32, w: 23, l: 12 },
+      { seed: 4,  name: 'Kansas',        nrtg: 29.20, w: 23, l: 10 },
+      { seed: 13, name: 'Cal Baptist',   nrtg:  3.23, w: 25, l: 8  },
+      { seed: 6,  name: 'Louisville',    nrtg: 31.58, w: 23, l: 10 },
+      { seed: 11, name: 'South Florida', nrtg: 17.56, w: 25, l: 8  },
+      { seed: 3,  name: 'Michigan St.',  nrtg: 33.34, w: 25, l: 7  },
+      { seed: 14, name: 'N. Dakota St.', nrtg:  3.20, w: 27, l: 7  },
+      { seed: 7,  name: 'UCLA',          nrtg: 25.63, w: 23, l: 11 },
+      { seed: 10, name: 'UCF',           nrtg: 17.75, w: 21, l: 11 },
+      { seed: 2,  name: 'UConn',         nrtg: 32.26, w: 29, l: 5  },
+      { seed: 15, name: 'Furman',        nrtg: -4.96, w: 22, l: 12 },
+    ]
+  },
+  south: {
+    name: 'SOUTH',
+    teams: [
+      { seed: 1,  name: 'Florida',          nrtg: 37.27, w: 26, l: 7  },
+      { seed: 16, name: 'Prairie View A&M', nrtg:-17.16, w: 18, l: 17 },
+      { seed: 8,  name: 'Clemson',          nrtg: 23.83, w: 24, l: 10 },
+      { seed: 9,  name: 'Iowa',             nrtg: 27.23, w: 21, l: 12 },
+      { seed: 5,  name: 'Vanderbilt',       nrtg: 30.52, w: 26, l: 8  },
+      { seed: 12, name: 'McNeese',          nrtg: 11.00, w: 28, l: 5  },
+      { seed: 4,  name: 'Nebraska',         nrtg: 30.24, w: 26, l: 6  },
+      { seed: 13, name: 'Troy',             nrtg: -1.44, w: 22, l: 11 },
+      { seed: 6,  name: 'North Carolina',   nrtg: 26.12, w: 24, l: 8  },
+      { seed: 11, name: 'VCU',              nrtg: 17.68, w: 27, l: 7  },
+      { seed: 3,  name: 'Illinois',         nrtg: 37.84, w: 24, l: 8  },
+      { seed: 14, name: 'Penn',             nrtg: -1.60, w: 18, l: 11 },
+      { seed: 7,  name: "Saint Mary's",     nrtg: 25.81, w: 27, l: 5  },
+      { seed: 10, name: 'Texas A&M',        nrtg: 21.28, w: 21, l: 11 },
+      { seed: 2,  name: 'Houston',          nrtg: 37.58, w: 28, l: 6  },
+      { seed: 15, name: 'Idaho',            nrtg: -0.71, w: 21, l: 14 },
+    ]
+  },
+  west: {
+    name: 'WEST',
+    teams: [
+      { seed: 1,  name: 'Arizona',       nrtg: 40.73, w: 32, l: 2  },
+      { seed: 16, name: 'Long Island',   nrtg: -7.87, w: 24, l: 10 },
+      { seed: 8,  name: 'Villanova',     nrtg: 23.07, w: 24, l: 8  },
+      { seed: 9,  name: 'Utah St.',      nrtg: 24.44, w: 28, l: 6  },
+      { seed: 5,  name: 'Wisconsin',     nrtg: 27.24, w: 24, l: 10 },
+      { seed: 12, name: 'High Point',    nrtg:  8.62, w: 30, l: 4  },
+      { seed: 4,  name: 'Arkansas',      nrtg: 30.05, w: 26, l: 8  },
+      { seed: 13, name: 'Hawaii',        nrtg:  6.14, w: 24, l: 8  },
+      { seed: 6,  name: 'BYU',           nrtg: 28.62, w: 23, l: 11 },
+      { seed: 11, name: 'Texas',         nrtg: 21.44, w: 18, l: 14 },
+      { seed: 3,  name: 'Gonzaga',       nrtg: 34.38, w: 30, l: 3  },
+      { seed: 14, name: 'Kennesaw St.',  nrtg: -0.85, w: 21, l: 13 },
+      { seed: 7,  name: 'Miami FL',      nrtg: 24.00, w: 25, l: 8  },
+      { seed: 10, name: 'Missouri',      nrtg: 16.99, w: 20, l: 12 },
+      { seed: 2,  name: 'Purdue',        nrtg: 36.59, w: 27, l: 8  },
+      { seed: 15, name: 'Queens (N.C.)', nrtg: -5.42, w: 21, l: 13 },
+    ]
+  },
+  midwest: {
+    name: 'MIDWEST',
+    teams: [
+      { seed: 1,  name: 'Michigan',       nrtg: 43.95, w: 31, l: 3  },
+      { seed: 16, name: 'Howard',         nrtg: -7.49, w: 23, l: 10 },
+      { seed: 8,  name: 'Georgia',        nrtg: 24.86, w: 22, l: 10 },
+      { seed: 9,  name: 'Saint Louis',    nrtg: 22.59, w: 28, l: 5  },
+      { seed: 5,  name: 'Texas Tech',     nrtg: 30.22, w: 22, l: 10 },
+      { seed: 12, name: 'Akron',          nrtg: 11.47, w: 29, l: 5  },
+      { seed: 4,  name: 'Alabama',        nrtg: 30.02, w: 23, l: 9  },
+      { seed: 13, name: 'Hofstra',        nrtg:  6.43, w: 24, l: 10 },
+      { seed: 6,  name: 'Tennessee',      nrtg: 30.28, w: 22, l: 11 },
+      { seed: 11, name: 'Miami (Ohio)',   nrtg:  6.11, w: 31, l: 1  },
+      { seed: 3,  name: 'Virginia',       nrtg: 30.43, w: 29, l: 5  },
+      { seed: 14, name: 'Wright St.',     nrtg: -0.29, w: 23, l: 11 },
+      { seed: 7,  name: 'Kentucky',       nrtg: 26.79, w: 21, l: 13 },
+      { seed: 10, name: 'Santa Clara',    nrtg: 21.67, w: 26, l: 8  },
+      { seed: 2,  name: 'Iowa St.',       nrtg: 37.30, w: 27, l: 7  },
+      { seed: 15, name: 'Tennessee St.',  nrtg: -6.76, w: 23, l: 9  },
+    ]
+  }
+};
+
+// ══════════════════════════════════════════════════════════════════════
+//  STATE
+//  bracket[regionKey][round][gameIndex] = { t1, t2, score1, score2, winner }
+//  t1/t2 = { seed, name } | null
+// ══════════════════════════════════════════════════════════════════════
+let bracket = {};
+let ffGames  = [null, null]; // [0]=East vs South winner, [1]=West vs Midwest winner
+let ffScores = [null, null];
+let champion = null;
+let champGame = null;
+
+function initBracket() {
+  bracket = {};
+  ffGames  = [null, null];
+  ffScores = [null, null];
+  champion = null;
+  champGame = null;
+
+  for (const [key, region] of Object.entries(REGIONS)) {
+    bracket[key] = [];
+    // Round 0 (R64): 8 games from 16 teams
+    const r0 = [];
+    for (let i = 0; i < 16; i += 2) {
+      r0.push({ t1: region.teams[i], t2: region.teams[i+1], score1: null, score2: null, roll1: null, roll2: null, narrative1: null, narrative2: null, winner: null });
+    }
+    bracket[key].push(r0);
+    // Rounds 1-3: empty slots (filled by advancement)
+    bracket[key].push(Array(4).fill(null).map(() => ({ t1: null, t2: null, score1: null, score2: null, roll1: null, roll2: null, narrative1: null, narrative2: null, winner: null })));
+    bracket[key].push(Array(2).fill(null).map(() => ({ t1: null, t2: null, score1: null, score2: null, roll1: null, roll2: null, narrative1: null, narrative2: null, winner: null })));
+    bracket[key].push(Array(1).fill(null).map(() => ({ t1: null, t2: null, score1: null, score2: null, roll1: null, roll2: null, narrative1: null, narrative2: null, winner: null })));
+  }
+}
+
+// ══════════════════════════════════════════════════════════════════════
+//  ONE-ROLL PLAYBOOK ENGINE (2026 Edition)
+// ══════════════════════════════════════════════════════════════════════
+
+function d20roll() { return Math.floor(Math.random() * 20) + 1; }
+
+// Step 1: TSR from NRtg
+function getTSR(nrtg) {
+  if (nrtg >= 25.0)  return +3;
+  if (nrtg >= 15.0)  return +2;
+  if (nrtg >=  5.0)  return +1;
+  if (nrtg >= -4.9)  return  0;
+  if (nrtg >= -15.0) return -1;
+  return -2;
+}
+
+// TSR label
+function getTSRLabel(nrtg) {
+  if (nrtg >= 25.0)  return 'National Title Favorite';
+  if (nrtg >= 15.0)  return 'Elite / Top 10';
+  if (nrtg >=  5.0)  return 'Tournament Contender';
+  if (nrtg >= -4.9)  return 'Average / Bubble Team';
+  if (nrtg >= -15.0) return 'Low Seed / Upset Potential';
+  return 'Bottom Tier';
+}
+
+// Step 3: D20 scoring table
+const D20_TABLE = [
+  { min: 1,  max: 1,  mod: -18, narrative: 'Total Collapse: Team shoots <30%. Absolute offensive failure.' },
+  { min: 2,  max: 4,  mod: -10, narrative: 'Defensive Lock: Opposing big man dominates the paint.' },
+  { min: 5,  max: 9,  mod:  -4, narrative: 'Cold Spell: Star player in foul trouble; rotation is out of sync.' },
+  { min: 10, max: 14, mod:  +2, narrative: 'Standard Flow: Trading baskets. Good ball movement.' },
+  { min: 15, max: 18, mod:  +8, narrative: 'Heating Up: Hitting the extra-pass 3s. Momentum building.' },
+  { min: 19, max: 19, mod: +14, narrative: 'On Fire: A massive 12-0 run defines the second half.' },
+  { min: 20, max: 20, mod: +22, narrative: 'Historic Night: Everything falls. Bench players hitting 3s.' },
+];
+
+function getD20Result(roll) {
+  return D20_TABLE.find(r => roll >= r.min && roll <= r.max);
+}
+
+// Step 2: base score for a team given opponent
+// 75 + (Offense TSR × 3) - (Opponent Defense TSR × 2)
+function baseScore(teamTSR, oppTSR) {
+  return 75 + (teamTSR * 3) - (oppTSR * 2);
+}
+
+// Full auto-play (used by sim buttons)
+function autoPlayGame(t1, t2) {
+  const tsr1 = getTSR(t1.nrtg ?? 0);
+  const tsr2 = getTSR(t2.nrtg ?? 0);
+  const base1 = baseScore(tsr1, tsr2);
+  const base2 = baseScore(tsr2, tsr1);
+
+  function calcScore(base, oppTSR) {
+    const roll = d20roll();
+    const result = getD20Result(roll);
+    return { roll, mod: result.mod, score: base + result.mod, narrative: result.narrative };
+  }
+
+  let r1 = calcScore(base1, tsr2);
+  let r2 = calcScore(base2, tsr1);
+  let s1 = r1.score, s2 = r2.score;
+  let otRounds = 0;
+
+  // Overtime
+  while (s1 === s2) {
+    const ot1 = calcScore(base1, tsr2);
+    const ot2 = calcScore(base2, tsr1);
+    s1 += Math.ceil(ot1.score / 8);
+    s2 += Math.ceil(ot2.score / 8);
+    otRounds++;
+    if (otRounds > 5) { s1++; break; } // safety
+  }
+
+  return {
+    score1: s1, score2: s2,
+    roll1: r1.roll, roll2: r2.roll,
+    narrative1: r1.narrative, narrative2: r2.narrative,
+    otRounds,
+    logLine: `${t1.name} ${s1} — ${s2} ${t2.name} (rolled ${r1.roll}/${r2.roll}${otRounds ? `, ${otRounds}OT` : ''})`
+  };
+}
+
+// ══════════════════════════════════════════════════════════════════════
+//  GAME RESOLUTION
+// ══════════════════════════════════════════════════════════════════════
+function commitResult(game, score1, score2, afterCommit) {
+  game.score1 = score1;
+  game.score2 = score2;
+  game.winner = score1 > score2 ? game.t1 : game.t2;
+  afterCommit(game.winner);
+  render();
+}
+
+function resolveGame(regionKey, round, gameIdx) {
+  const game = bracket[regionKey][round][gameIdx];
+  if (!game || !game.t1 || !game.t2 || game.winner) return;
+  const result = autoPlayGame(game.t1, game.t2);
+  game.score1 = result.score1; game.score2 = result.score2;
+  game.roll1 = result.roll1; game.roll2 = result.roll2;
+  game.narrative1 = result.narrative1; game.narrative2 = result.narrative2;
+  game.winner = result.score1 > result.score2 ? game.t1 : game.t2;
+  logDice(`[${REGIONS[regionKey].name} R${round+1} G${gameIdx+1}] ${result.logLine}`);
+  advanceGameWinner(regionKey, round, gameIdx, game.winner);
+  render();
+}
+
+function advanceGameWinner(regionKey, round, gameIdx, winner) {
+  if (round < 3) {
+    const nextGame = Math.floor(gameIdx / 2);
+    const slot = gameIdx % 2 === 0 ? 't1' : 't2';
+    bracket[regionKey][round + 1][nextGame][slot] = winner;
+  } else {
+    advanceToFF(regionKey, winner);
+  }
+}
+
+function resolveFF(ffIdx) {
+  const g = ffGames[ffIdx];
+  if (!g || !g.t1 || !g.t2 || g.winner) return;
+  const result = autoPlayGame(g.t1, g.t2);
+  g.score1 = result.score1; g.score2 = result.score2;
+  g.roll1 = result.roll1; g.roll2 = result.roll2;
+  g.narrative1 = result.narrative1; g.narrative2 = result.narrative2;
+  g.winner = result.score1 > result.score2 ? g.t1 : g.t2;
+  ffScores[ffIdx] = { s1: result.score1, s2: result.score2 };
+  logDice(`[SEMI ${ffIdx+1}] ${result.logLine}`);
+  if (!champGame) champGame = { t1: null, t2: null, score1: null, score2: null, winner: null };
+  if (ffIdx === 0) champGame.t1 = g.winner;
+  else             champGame.t2 = g.winner;
+  render();
+}
+
+function resolveChamp() {
+  if (!champGame || !champGame.t1 || !champGame.t2 || champGame.winner) return;
+  const result = autoPlayGame(champGame.t1, champGame.t2);
+  champGame.score1 = result.score1; champGame.score2 = result.score2;
+  champGame.roll1 = result.roll1; champGame.roll2 = result.roll2;
+  champGame.narrative1 = result.narrative1; champGame.narrative2 = result.narrative2;
+  champGame.winner = result.score1 > result.score2 ? champGame.t1 : champGame.t2;
+  champion = champGame.winner;
+  logDice(`[NATIONAL CHAMPIONSHIP] ${result.logLine}`);
+  render();
+  document.getElementById('champion-banner').style.display = 'block';
+  document.getElementById('champion-banner').textContent =
+    `🏆 2026 NATIONAL CHAMPION: ${champion.name} (${champion.seed} seed) 🏆`;
+}
+
+function advanceToFF(regionKey, winner) {
+  // East (idx 0) feeds FF game 0 slot t1
+  // South (idx 1) feeds FF game 0 slot t2
+  // West (idx 2) feeds FF game 1 slot t1
+  // Midwest (idx 3) feeds FF game 1 slot t2
+  const map = { east: [0,'t1'], south: [0,'t2'], west: [1,'t1'], midwest: [1,'t2'] };
+  const [ffIdx, slot] = map[regionKey];
+  if (!ffGames[ffIdx]) ffGames[ffIdx] = { t1: null, t2: null, score1: null, score2: null, winner: null };
+  ffGames[ffIdx][slot] = winner;
+}
+
+// ══════════════════════════════════════════════════════════════════════
+//  SIM HELPERS
+// ══════════════════════════════════════════════════════════════════════
+function simRegion(regionKey) {
+  // Roll all ready (unlocked) games in round 0 for that region
+  const round0 = bracket[regionKey][0];
+  let rolled = false;
+  for (let i = 0; i < round0.length; i++) {
+    const g = round0[i];
+    if (g.t1 && g.t2 && !g.winner) { resolveGame(regionKey, 0, i); rolled = true; }
+  }
+  if (!rolled) {
+    // Try next available round
+    for (let r = 1; r < 4; r++) {
+      const rnd = bracket[regionKey][r];
+      for (let i = 0; i < rnd.length; i++) {
+        const g = rnd[i];
+        if (g.t1 && g.t2 && !g.winner) { resolveGame(regionKey, r, i); }
+      }
+    }
+  }
+}
+
+function simAll() {
+  for (let pass = 0; pass < 10; pass++) {
+    for (const key of ['east','south','west','midwest']) {
+      for (let r = 0; r < 4; r++) {
+        for (let i = 0; i < bracket[key][r].length; i++) {
+          const g = bracket[key][r][i];
+          if (g && g.t1 && g.t2 && !g.winner) resolveGame(key, r, i);
+        }
+      }
+    }
+    // FF
+    for (let i = 0; i < 2; i++) {
+      const g = ffGames[i];
+      if (g && g.t1 && g.t2 && !g.winner) resolveFF(i);
+    }
+    if (champGame && champGame.t1 && champGame.t2 && !champGame.winner) resolveChamp();
+  }
+}
+
+function resetBracket() {
+  document.getElementById('champion-banner').style.display = 'none';
+  document.getElementById('dice-log').innerHTML = '<div style="color:#4b5563;font-style:italic">Roll a game to see dice results here...</div>';
+  initBracket();
+  render();
+}
+
+// ══════════════════════════════════════════════════════════════════════
+//  RENDER
+// ══════════════════════════════════════════════════════════════════════
+function logDice(msg) {
+  const log = document.getElementById('dice-log');
+  const isFirst = log.querySelector('div[style]');
+  if (isFirst) log.innerHTML = '';
+  const div = document.createElement('div');
+  div.className = 'entry';
+  div.innerHTML = `<span>▶</span> ${msg}`;
+  log.prepend(div);
+}
+
+function teamSlotHTML(team, score, isWinner, isLoser) {
+  const cls = isWinner ? ' winner' : isLoser ? ' loser' : team ? '' : ' empty';
+  const seedStr = team ? `<span class="seed">${team.seed}</span>` : '';
+  const nameStr = team ? `<span class="team-name">${team.name}</span>` : `<span class="team-name">TBD</span>`;
+  const scoreStr = score !== null ? `<span class="score-badge">${score}</span>` : '';
+  return `<div class="team-slot${cls}">${seedStr}${nameStr}${scoreStr}</div>`;
+}
+
+function gameCardHTML(game, regionKey, round, idx, isFF = false) {
+  if (!game) return '';
+  const cls = isFF ? 'ff-game' : 'game';
+  const ready = game.t1 && game.t2 && !game.winner;
+  const done  = !!game.winner;
+  const locked = !game.t1 || !game.t2;
+
+  let stateClass = locked ? ' locked' : ready ? ' ready' : done ? ' done' : '';
+  if (isFF) stateClass = '';
+
+  const w = game.winner;
+  const s1 = teamSlotHTML(game.t1, game.score1, w && w === game.t1, w && w !== game.t1);
+  const s2 = teamSlotHTML(game.t2, game.score2, w && w === game.t2, w && w !== game.t2);
+
+  let btnHTML = '';
+  if (isFF) {
+    const cb = `openModal('ff', {ffIdx:${idx}})`;
+    btnHTML = `<button class="roll-btn${done ? ' btn-done' : ''}" onclick="${cb}" ${(!ready && !done) ? 'disabled' : ''}>${done ? '✓ Done' : ready ? '▶ Play' : '⏳ Wait'}</button>`;
+  } else {
+    const cb = `openModal('region', {regionKey:'${regionKey}', round:${round}, gameIdx:${idx}})`;
+    btnHTML = `<button class="roll-btn${done ? ' btn-done' : ''}" onclick="${cb}" ${(!ready && !done) ? 'disabled' : ''}>${done ? '✓ Done' : ready ? '▶ Play' : '⏳ Wait'}</button>`;
+  }
+
+  return `<div class="${cls}${stateClass}">${s1}${s2}<div class="game-footer">${btnHTML}</div></div>`;
+}
+
+function ffGameHTML(ffIdx) {
+  const g = ffGames[ffIdx];
+  const tbd = `<div class="ff-game" style="opacity:0.3"><div class="team-slot empty"><span class="team-name">TBD</span></div><div class="team-slot empty"><span class="team-name">TBD</span></div><div class="game-footer"><button class="roll-btn" disabled>⏳ Wait</button></div></div>`;
+  return g ? gameCardHTML(g, null, null, ffIdx, true) : tbd;
+}
+
+function render() {
+  const container = document.getElementById('bracket');
+
+  // ── Helper: build round cols for a region ──
+  function roundCols(key, reversed = false) {
+    let html = '';
+    const rounds = reversed ? [3,2,1,0] : [0,1,2,3];
+    for (const r of rounds) {
+      html += '<div class="round-col">';
+      for (let i = 0; i < bracket[key][r].length; i++) {
+        html += gameCardHTML(bracket[key][r][i], key, r, i);
+      }
+      html += '</div>';
+    }
+    return html;
+  }
+
+  // ── Left side: East (top) + South (bottom) ──
+  const leftHTML = `
+    <div class="side-left">
+      <div class="region-half">
+        <div class="region-label">EAST</div>
+        <div class="region-rounds">${roundCols('east')}</div>
+      </div>
+      <div class="region-half">
+        <div class="region-label">SOUTH</div>
+        <div class="region-rounds">${roundCols('south')}</div>
+      </div>
+    </div>`;
+
+  // ── Center: FF + Championship (vertically centered) ──
+  let champHTML;
+  if (champGame) {
+    const w = champGame.winner;
+    const ready = champGame.t1 && champGame.t2 && !champGame.winner;
+    const done  = !!champGame.winner;
+    const s1 = teamSlotHTML(champGame.t1, champGame.score1, w && w === champGame.t1, w && w !== champGame.t1);
+    const s2 = teamSlotHTML(champGame.t2, champGame.score2, w && w === champGame.t2, w && w !== champGame.t2);
+    const btn = `<button class="roll-btn${done?' btn-done':''}" onclick="openModal('champ',{})" ${(!ready&&!done)?'disabled':''}>${done?'✓ Champion':ready?'▶ Play':'⏳ Wait'}</button>`;
+    champHTML = `<div class="ff-game">${s1}${s2}<div class="game-footer">${btn}</div></div>`;
+  } else {
+    champHTML = `<div class="ff-game" style="opacity:0.25"><div class="team-slot empty"><span class="team-name">TBD</span></div><div class="team-slot empty"><span class="team-name">TBD</span></div><div class="game-footer"><button class="roll-btn" disabled>⏳ Wait</button></div></div>`;
+  }
+
+  const centerHTML = `
+    <div class="center-col">
+      <div class="ff-label">East vs South</div>
+      ${ffGameHTML(0)}
+      <div style="text-align:center;font-size:10px;font-weight:800;color:#f5c518;letter-spacing:2px;margin:4px 0">CHAMPIONSHIP</div>
+      ${champHTML}
+      <div class="ff-label">West vs Midwest</div>
+      ${ffGameHTML(1)}
+    </div>`;
+
+  // ── Right side: West (top) + Midwest (bottom) ──
+  const rightHTML = `
+    <div class="side-right">
+      <div class="region-half">
+        <div class="region-label right">WEST</div>
+        <div class="region-rounds">${roundCols('west', true)}</div>
+      </div>
+      <div class="region-half">
+        <div class="region-label right">MIDWEST</div>
+        <div class="region-rounds">${roundCols('midwest', true)}</div>
+      </div>
+    </div>`;
+
+  container.innerHTML = `<div class="bracket-main">${leftHTML}${centerHTML}${rightHTML}</div>`;
+}
+
+// ══════════════════════════════════════════════════════════════════════
+//  TABS
+// ══════════════════════════════════════════════════════════════════════
+let activeTab = 'bracket';
+
+function switchTab(tab) {
+  activeTab = tab;
+  document.getElementById('tab-bracket').style.display = tab === 'bracket' ? '' : 'none';
+  document.getElementById('tab-results').style.display  = tab === 'results'  ? '' : 'none';
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  event.target.classList.add('active');
+  if (tab === 'results') renderResults();
+}
+
+function renderResults() {
+  const container = document.getElementById('tab-results');
+
+  const ROUNDS = [
+    { label: 'Round of 64', key: 0 },
+    { label: 'Round of 32', key: 1 },
+    { label: 'Sweet 16',    key: 2 },
+    { label: 'Elite 8',     key: 3 },
+  ];
+  const REGION_NAMES = { east: 'East', south: 'South', west: 'West', midwest: 'Midwest' };
+
+  function gameRow(t1, t2, s1, s2, winner, region) {
+    if (!t1 && !t2) return '';
+    if (!winner) {
+      const n1 = t1 ? `(${t1.seed}) ${t1.name}` : 'TBD';
+      const n2 = t2 ? `(${t2.seed}) ${t2.name}` : 'TBD';
+      return `<tr><td class="res-pending">${n1} vs ${n2}</td><td></td><td></td><td class="res-region">${region||''}</td></tr>`;
+    }
+    const loser  = winner === t1 ? t2 : t1;
+    const wScore = winner === t1 ? s1 : s2;
+    const lScore = winner === t1 ? s2 : s1;
+    return `<tr>
+      <td class="res-winner">(${winner.seed}) ${winner.name}</td>
+      <td class="res-score">${wScore} – ${lScore}</td>
+      <td class="res-loser">(${loser.seed}) ${loser.name}</td>
+      <td class="res-region">${region||''}</td>
+    </tr>`;
+  }
+
+  let html = '';
+
+  // Regional rounds
+  for (const { label, key } of ROUNDS) {
+    let rows = '';
+    for (const [regionKey, regionName] of Object.entries(REGION_NAMES)) {
+      for (const g of bracket[regionKey][key]) {
+        rows += gameRow(g.t1, g.t2, g.score1, g.score2, g.winner, regionName);
+      }
+    }
+    if (!rows) continue;
+    html += `<div class="results-section">
+      <h2>${label}</h2>
+      <table class="results-table">
+        <thead><tr><th>Winner</th><th>Score</th><th>Loser</th><th>Region</th></tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </div>`;
+  }
+
+  // Final Four
+  let ffRows = '';
+  const ffLabels = ['East vs South', 'West vs Midwest'];
+  for (let i = 0; i < 2; i++) {
+    const g = ffGames[i];
+    if (g) ffRows += gameRow(g.t1, g.t2, g.score1, g.score2, g.winner, ffLabels[i]);
+  }
+  if (ffRows) {
+    html += `<div class="results-section">
+      <h2>Final Four</h2>
+      <table class="results-table">
+        <thead><tr><th>Winner</th><th>Score</th><th>Loser</th><th>Matchup</th></tr></thead>
+        <tbody>${ffRows}</tbody>
+      </table>
+    </div>`;
+  }
+
+  // Championship
+  if (champGame && (champGame.t1 || champGame.t2)) {
+    const g = champGame;
+    const row = gameRow(g.t1, g.t2, g.score1, g.score2, g.winner, '');
+    html += `<div class="results-section">
+      <h2>National Championship</h2>
+      <table class="results-table">
+        <thead><tr><th>Winner</th><th>Score</th><th>Loser</th><th></th></tr></thead>
+        <tbody>${row}</tbody>
+      </table>
+    </div>`;
+  }
+
+  if (!html) html = '<p style="color:#4b5563;font-style:italic">No results yet — roll some games first.</p>';
+  container.innerHTML = html;
+}
+
+// ══════════════════════════════════════════════════════════════════════
+//  PLAY MODAL
+// ══════════════════════════════════════════════════════════════════════
+let modalCtx = null; // { type: 'region'|'ff'|'champ', regionKey, round, gameIdx, ffIdx, t1, t2, tsr1, tsr2, base1, base2 }
+
+function tsrClass(tsr) {
+  return tsr > 0 ? 'tp-tsr-pos' : tsr < 0 ? 'tp-tsr-neg' : 'tp-tsr-zero';
+}
+
+function buildTeamPanel(panelId, team, oppTSR) {
+  if (!team) return;
+  const tsr = getTSR(team.nrtg);
+  const base = baseScore(tsr, oppTSR);
+  const nrtgStr = (team.nrtg >= 0 ? '+' : '') + team.nrtg.toFixed(2);
+  const tsrStr  = (tsr >= 0 ? '+' : '') + tsr;
+  document.getElementById(panelId).innerHTML = `
+    <div class="tp-seed">Seed ${team.seed}</div>
+    <div class="tp-name">${team.name}</div>
+    <div class="tp-row"><span class="tp-label">Record</span><span class="tp-val">${team.w ?? '?'}-${team.l ?? '?'}</span></div>
+    <div class="tp-row"><span class="tp-label">NRtg</span><span class="tp-val">${nrtgStr}</span></div>
+    <div class="tp-row"><span class="tp-label">TSR</span><span class="tp-val ${tsrClass(tsr)}">${tsrStr} — ${getTSRLabel(team.nrtg)}</span></div>
+    <div class="tp-formula">
+      Base: 75 + (${tsrStr}×3) − (${(oppTSR>=0?'+':'')+oppTSR}×2) = <span class="formula-val">${base}</span>
+    </div>`;
+}
+
+function openModal(type, opts) {
+  const { regionKey, round, gameIdx, ffIdx } = opts;
+  let game, label;
+  if (type === 'region') {
+    game = bracket[regionKey][round][gameIdx];
+    const roundNames = ['Round of 64','Round of 32','Sweet 16','Elite 8'];
+    label = `${REGIONS[regionKey].name} — ${roundNames[round]}`;
+  } else if (type === 'ff') {
+    game = ffGames[ffIdx];
+    label = ffIdx === 0 ? 'Final Four — East vs South' : 'Final Four — West vs Midwest';
+  } else {
+    game = champGame;
+    label = 'National Championship';
+  }
+  if (!game || !game.t1 || !game.t2) return;
+
+  const viewOnly = !!game.winner;
+  const tsr1 = getTSR(game.t1.nrtg ?? 0);
+  const tsr2 = getTSR(game.t2.nrtg ?? 0);
+
+  modalCtx = viewOnly ? null : { type, regionKey, round, gameIdx, ffIdx, t1: game.t1, t2: game.t2, tsr1, tsr2,
+    base1: baseScore(tsr1, tsr2), base2: baseScore(tsr2, tsr1) };
+
+  document.getElementById('modal-title').textContent = (viewOnly ? '📋 Result — ' : '') + label;
+  buildTeamPanel('panel-t1', game.t1, tsr2);
+  buildTeamPanel('panel-t2', game.t2, tsr1);
+  document.getElementById('roll-name-1').textContent = game.t1.name;
+  document.getElementById('roll-name-2').textContent = game.t2.name;
+
+  // Populate rolls + narratives (pre-filled for view, blank for play)
+  const inp1 = document.getElementById('roll-input-1');
+  const inp2 = document.getElementById('roll-input-2');
+  inp1.value = game.roll1 ?? '';
+  inp2.value = game.roll2 ?? '';
+  inp1.disabled = viewOnly;
+  inp2.disabled = viewOnly;
+  document.querySelectorAll('.auto-roll-btn').forEach(b => b.disabled = viewOnly);
+  document.getElementById('narrative-1').textContent = game.roll1 ? `Roll ${game.roll1}: ${game.narrative1 ?? ''}` : '';
+  document.getElementById('narrative-2').textContent = game.roll2 ? `Roll ${game.roll2}: ${game.narrative2 ?? ''}` : '';
+
+  if (viewOnly) {
+    const w = game.winner;
+    document.getElementById('score-display').classList.remove('pending');
+    document.getElementById('score-line').textContent = `${game.score1} — ${game.score2}`;
+    document.getElementById('score-teams').textContent = `${game.t1.name} vs ${game.t2.name}`;
+    document.getElementById('score-winner').textContent = `Winner: ${w.name}`;
+    document.getElementById('ot-badge').textContent = '';
+    const sb = document.getElementById('submit-btn');
+    sb.textContent = 'Close'; sb.disabled = false;
+    sb.onclick = closeModal;
+  } else {
+    document.getElementById('score-line').textContent = '— vs —';
+    document.getElementById('score-teams').textContent = '';
+    document.getElementById('score-winner').textContent = '';
+    document.getElementById('ot-badge').textContent = '';
+    document.getElementById('score-display').classList.add('pending');
+    const sb = document.getElementById('submit-btn');
+    sb.textContent = 'Submit Result'; sb.disabled = true;
+    sb.onclick = submitModal;
+  }
+
+  document.getElementById('play-modal').classList.add('open');
+}
+
+function closeModal() {
+  document.getElementById('play-modal').classList.remove('open');
+  modalCtx = null;
+}
+
+function autoRoll(teamNum) {
+  const roll = d20roll();
+  document.getElementById(`roll-input-${teamNum}`).value = roll;
+  onRollInput(teamNum);
+}
+
+function onRollInput(teamNum) {
+  if (!modalCtx) return;
+  const val = parseInt(document.getElementById(`roll-input-${teamNum}`).value);
+  if (!val || val < 1 || val > 20) {
+    document.getElementById(`narrative-${teamNum}`).textContent = '';
+    updateScoreDisplay();
+    return;
+  }
+  const result = getD20Result(val);
+  document.getElementById(`narrative-${teamNum}`).textContent = `Roll ${val}: ${result.narrative}`;
+  updateScoreDisplay();
+}
+
+function updateScoreDisplay() {
+  if (!modalCtx) return;
+  const v1 = parseInt(document.getElementById('roll-input-1').value);
+  const v2 = parseInt(document.getElementById('roll-input-2').value);
+  const bothValid = v1 >= 1 && v1 <= 20 && v2 >= 1 && v2 <= 20;
+
+  if (!bothValid) {
+    document.getElementById('score-display').classList.add('pending');
+    document.getElementById('score-line').textContent = '— vs —';
+    document.getElementById('score-teams').textContent = '';
+    document.getElementById('score-winner').textContent = '';
+    document.getElementById('ot-badge').textContent = '';
+    document.getElementById('submit-btn').disabled = true;
+    return;
+  }
+
+  const r1 = getD20Result(v1), r2 = getD20Result(v2);
+  let s1 = modalCtx.base1 + r1.mod;
+  let s2 = modalCtx.base2 + r2.mod;
+  let otMsg = '';
+
+  // Auto-resolve OT with auto dice (show message)
+  if (s1 === s2) {
+    let otRounds = 0;
+    while (s1 === s2 && otRounds < 5) {
+      const ot1 = getD20Result(d20roll()), ot2 = getD20Result(d20roll());
+      s1 += Math.ceil((modalCtx.base1 + ot1.mod) / 8);
+      s2 += Math.ceil((modalCtx.base2 + ot2.mod) / 8);
+      otRounds++;
+    }
+    if (s1 === s2) s1++;
+    otMsg = `⚡ Tied after regulation — ${otRounds} OT period${otRounds > 1 ? 's' : ''} played`;
+  }
+
+  const winner = s1 > s2 ? modalCtx.t1 : modalCtx.t2;
+  document.getElementById('score-display').classList.remove('pending');
+  document.getElementById('score-line').textContent = `${s1} — ${s2}`;
+  document.getElementById('score-teams').textContent = `${modalCtx.t1.name} vs ${modalCtx.t2.name}`;
+  document.getElementById('score-winner').textContent = `Winner: ${winner.name}`;
+  document.getElementById('ot-badge').textContent = otMsg;
+  document.getElementById('submit-btn').disabled = false;
+
+  // Store pending scores on ctx for submit
+  modalCtx.pendingS1 = s1;
+  modalCtx.pendingS2 = s2;
+}
+
+function submitModal() {
+  if (!modalCtx || modalCtx.pendingS1 === undefined) return;
+  const { type, regionKey, round, gameIdx, ffIdx, t1, t2, pendingS1, pendingS2 } = modalCtx;
+  const winner = pendingS1 > pendingS2 ? t1 : t2;
+  const roll1 = parseInt(document.getElementById('roll-input-1').value) || null;
+  const roll2 = parseInt(document.getElementById('roll-input-2').value) || null;
+  const narr1 = roll1 ? getD20Result(roll1).narrative : null;
+  const narr2 = roll2 ? getD20Result(roll2).narrative : null;
+  const logLabel = type === 'region'
+    ? `[${REGIONS[regionKey].name} R${round+1} G${gameIdx+1}]`
+    : type === 'ff' ? `[SEMI ${ffIdx+1}]` : '[NATIONAL CHAMPIONSHIP]';
+  logDice(`${logLabel} ${t1.name} ${pendingS1} — ${pendingS2} ${t2.name}`);
+
+  function applyToGame(g) {
+    g.score1 = pendingS1; g.score2 = pendingS2; g.winner = winner;
+    g.roll1 = roll1; g.roll2 = roll2;
+    g.narrative1 = narr1; g.narrative2 = narr2;
+  }
+
+  if (type === 'region') {
+    applyToGame(bracket[regionKey][round][gameIdx]);
+    advanceGameWinner(regionKey, round, gameIdx, winner);
+  } else if (type === 'ff') {
+    applyToGame(ffGames[ffIdx]);
+    ffScores[ffIdx] = { s1: pendingS1, s2: pendingS2 };
+    if (!champGame) champGame = { t1: null, t2: null, score1: null, score2: null, roll1: null, roll2: null, narrative1: null, narrative2: null, winner: null };
+    if (ffIdx === 0) champGame.t1 = winner; else champGame.t2 = winner;
+  } else {
+    applyToGame(champGame);
+    champion = winner;
+    document.getElementById('champion-banner').style.display = 'block';
+    document.getElementById('champion-banner').textContent =
+      `🏆 2026 NATIONAL CHAMPION: ${winner.name} (${winner.seed} seed) 🏆`;
+  }
+
+  closeModal();
+  render();
+}
+
+// ══════════════════════════════════════════════════════════════════════
+//  IMPORT / EXPORT
+// ══════════════════════════════════════════════════════════════════════
+const CSV_HEADER = 'type,region,round,game_idx,team1,seed1,nrtg1,w1,l1,score1,roll1,narrative1,team2,seed2,nrtg2,w2,l2,score2,roll2,narrative2,winner';
+
+function gameToRow(type, g, extra = {}) {
+  if (!g || !g.t1 || !g.t2) return null;
+  const esc = v => (v == null ? '' : String(v).includes(',') ? `"${String(v).replace(/"/g,'""')}"` : String(v));
+  const t1 = g.t1, t2 = g.t2;
+  return [
+    type,
+    extra.region ?? '', extra.round ?? '', extra.game_idx ?? '',
+    esc(t1.name), t1.seed, t1.nrtg ?? '', t1.w ?? '', t1.l ?? '',
+    g.score1 ?? '', g.roll1 ?? '', esc(g.narrative1 ?? ''),
+    esc(t2.name), t2.seed, t2.nrtg ?? '', t2.w ?? '', t2.l ?? '',
+    g.score2 ?? '', g.roll2 ?? '', esc(g.narrative2 ?? ''),
+    esc(g.winner ? g.winner.name : '')
+  ].join(',');
+}
+
+function exportCSV() {
+  const rows = [CSV_HEADER];
+  for (const [key] of Object.entries(REGIONS)) {
+    for (let r = 0; r < 4; r++) {
+      for (let i = 0; i < bracket[key][r].length; i++) {
+        const row = gameToRow('region', bracket[key][r][i], { region: key, round: r, game_idx: i });
+        if (row) rows.push(row);
+      }
+    }
+  }
+  for (let i = 0; i < 2; i++) {
+    const row = gameToRow('ff', ffGames[i], { game_idx: i });
+    if (row) rows.push(row);
+  }
+  if (champGame && champGame.t1 && champGame.t2) {
+    const row = gameToRow('champ', champGame, {});
+    if (row) rows.push(row);
+  }
+  const blob = new Blob([rows.join('\n')], { type: 'text/csv' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'march-madness-2026.csv';
+  a.click();
+}
+
+function importCSV() {
+  document.getElementById('csv-import-input').click();
+}
+
+function onCSVImport(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = ev => {
+    try {
+      loadFromCSV(ev.target.result);
+    } catch(err) {
+      alert('Import failed: ' + err.message);
+    }
+    e.target.value = '';
+  };
+  reader.readAsText(file);
+}
+
+function parseCSVRow(line) {
+  // Handles quoted fields with embedded commas
+  const result = [];
+  let cur = '', inQ = false;
+  for (let i = 0; i < line.length; i++) {
+    const c = line[i];
+    if (c === '"') {
+      if (inQ && line[i+1] === '"') { cur += '"'; i++; }
+      else inQ = !inQ;
+    } else if (c === ',' && !inQ) {
+      result.push(cur); cur = '';
+    } else {
+      cur += c;
+    }
+  }
+  result.push(cur);
+  return result;
+}
+
+function findTeamInRegions(name) {
+  for (const [, region] of Object.entries(REGIONS))
+    for (const t of region.teams)
+      if (t.name === name) return t;
+  return null;
+}
+
+function loadFromCSV(text) {
+  initBracket(); // reset first
+  document.getElementById('champion-banner').style.display = 'none';
+  champion = null;
+
+  const lines = text.trim().split('\n');
+  // skip header
+  const dataLines = lines.slice(1);
+
+  // Sort: region rounds 0-3 first (in order), then ff, then champ
+  const regionRows = [], ffRows = [], champRows = [];
+  for (const line of dataLines) {
+    if (!line.trim()) continue;
+    const cols = parseCSVRow(line);
+    const type = cols[0].trim();
+    if (type === 'region') regionRows.push(cols);
+    else if (type === 'ff') ffRows.push(cols);
+    else if (type === 'champ') champRows.push(cols);
+  }
+  // Sort region rows by round then game_idx
+  regionRows.sort((a, b) => (parseInt(a[2])||0) - (parseInt(b[2])||0) || (parseInt(a[3])||0) - (parseInt(b[3])||0));
+
+  function applyGame(g, cols) {
+    const score1 = cols[9] !== '' ? parseInt(cols[9]) : null;
+    const score2 = cols[17] !== '' ? parseInt(cols[17]) : null;
+    const roll1  = cols[10] !== '' ? parseInt(cols[10]) : null;
+    const roll2  = cols[18] !== '' ? parseInt(cols[18]) : null;
+    const narr1  = cols[11] || null;
+    const narr2  = cols[19] || null;
+    const winnerName = cols[20] || '';
+    if (score1 === null || score2 === null) return;
+    g.score1 = score1; g.score2 = score2;
+    g.roll1 = roll1; g.roll2 = roll2;
+    g.narrative1 = narr1; g.narrative2 = narr2;
+    g.winner = winnerName === g.t1?.name ? g.t1 : g.t2?.name === winnerName ? g.t2 : null;
+  }
+
+  for (const cols of regionRows) {
+    const regionKey = cols[1].trim();
+    const round = parseInt(cols[2]);
+    const gameIdx = parseInt(cols[3]);
+    if (!bracket[regionKey]?.[round]?.[gameIdx]) continue;
+    const g = bracket[regionKey][round][gameIdx];
+    // Set team refs from region data (already seeded in initBracket for round 0;
+    // for later rounds we need to find the team)
+    const t1name = cols[4], t2name = cols[12];
+    if (!g.t1) g.t1 = findTeamInRegions(t1name) || { name: t1name, seed: parseInt(cols[5]), nrtg: parseFloat(cols[6]), w: parseInt(cols[7]), l: parseInt(cols[8]) };
+    if (!g.t2) g.t2 = findTeamInRegions(t2name) || { name: t2name, seed: parseInt(cols[13]), nrtg: parseFloat(cols[14]), w: parseInt(cols[15]), l: parseInt(cols[16]) };
+    applyGame(g, cols);
+    if (g.winner) advanceGameWinner(regionKey, round, gameIdx, g.winner);
+  }
+
+  for (const cols of ffRows) {
+    const ffIdx = parseInt(cols[3]);
+    if (!ffGames[ffIdx]) ffGames[ffIdx] = { t1: null, t2: null, score1: null, score2: null, roll1: null, roll2: null, narrative1: null, narrative2: null, winner: null };
+    const g = ffGames[ffIdx];
+    const t1name = cols[4], t2name = cols[12];
+    if (!g.t1) g.t1 = findTeamInRegions(t1name) || { name: t1name, seed: parseInt(cols[5]) };
+    if (!g.t2) g.t2 = findTeamInRegions(t2name) || { name: t2name, seed: parseInt(cols[13]) };
+    applyGame(g, cols);
+    if (g.winner) {
+      if (!champGame) champGame = { t1: null, t2: null, score1: null, score2: null, roll1: null, roll2: null, narrative1: null, narrative2: null, winner: null };
+      if (ffIdx === 0) champGame.t1 = g.winner; else champGame.t2 = g.winner;
+    }
+  }
+
+  for (const cols of champRows) {
+    if (!champGame) champGame = { t1: null, t2: null, score1: null, score2: null, roll1: null, roll2: null, narrative1: null, narrative2: null, winner: null };
+    const g = champGame;
+    const t1name = cols[4], t2name = cols[12];
+    if (!g.t1) g.t1 = findTeamInRegions(t1name) || { name: t1name, seed: parseInt(cols[5]) };
+    if (!g.t2) g.t2 = findTeamInRegions(t2name) || { name: t2name, seed: parseInt(cols[13]) };
+    applyGame(g, cols);
+    if (g.winner) {
+      champion = g.winner;
+      document.getElementById('champion-banner').style.display = 'block';
+      document.getElementById('champion-banner').textContent =
+        `🏆 2026 NATIONAL CHAMPION: ${champion.name} (${champion.seed} seed) 🏆`;
+    }
+  }
+
+  logDice('📂 Bracket loaded from CSV');
+  render();
+}
+
+function showRules()  { document.getElementById('rules-modal').classList.add('open'); }
+function closeRules() { document.getElementById('rules-modal').classList.remove('open'); }
+
+// ══════════════════════════════════════════════════════════════════════
+//  THEME TOGGLE
+// ══════════════════════════════════════════════════════════════════════
+function toggleTheme() {
+  const isLight = document.body.classList.toggle('light');
+  const btn = document.getElementById('theme-toggle');
+  btn.textContent = isLight ? '☽ Dark' : '☀ Light';
+  btn.style.background = isLight ? '#d1d5db' : '#374151';
+  btn.style.color = isLight ? '#111827' : '#e8e8e8';
+}
+
+// ══════════════════════════════════════════════════════════════════════
+//  INIT
+// ══════════════════════════════════════════════════════════════════════
+initBracket();
+render();
+</script>
+</body>
+</html>
